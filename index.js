@@ -88,8 +88,8 @@ async function start() {
 		}
 	}
 	const outlog = await readFile("output.log");
-	console.log(outlog);
-	return;
+	console.log(outlog.toString());
+	throw new Error("unable to start nix cache");
 };
 
 
