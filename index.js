@@ -27,7 +27,6 @@ function req(path) {
 			rep.on("end", () => resolve({ statusCode: rep.statusCode, body: body.join() }));
 		});
 		req.on("error", (err) => reject(err));
-		req.on("close", () => { console.debug(`closed ${path}`) })
 		req.end();
 	});
 }
@@ -79,16 +78,17 @@ async function start() {
 		return;
 	}
 	const output = openSync("output.log", "a");
-	console.debug("running", process.argv0, import.meta.filename);
+	core.debug("running", process.argv0, import.meta.filename, "serve");
 	const server = child_process.spawn(process.argv0, [import.meta.filename, "serve"], { detached: true, stdio: ["ignore", output, output] });
 	server.unref();
-	for (; ;) {
+	for (let i=0; i < 20; i++) {
 		await setTimeout(1000);
 		if (await checkReady()) {
-			break;
+			return;
 		}
 	}
-	console.log("ready!");
+	const outlog = await readFile("output.log");
+	console.log(outlog);
 	return;
 };
 
@@ -274,10 +274,10 @@ export function serve(options) {
 	srv.listen(LISTEN);
 };
 
-if (process.argv[2] == "run") {
-	await run();
-} else if (process.argv[2] == "serve") {
+if (process.argv[2] == "serve") {
 	serve({ cache: cache, dir: "/tmp" });
 } else if (process.argv[2] == "serve-local") {
 	serve({ cache: memoryCache(), dir: "/tmp" });
+} else {
+	await run();
 }
