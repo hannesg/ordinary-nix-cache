@@ -1,0 +1,16 @@
+on: [push]
+
+jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    name: Yo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup Cache
+        uses: ./
+      - name: Nix build
+        run: nix copy --to "http://localhost:18008" ".#devShell.x86_64-linux"
+      - name: Cat log
+        run: cat output.log
