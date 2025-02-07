@@ -249,7 +249,7 @@ export function server(options) {
 }
 
 export function serve(options) {
-	if (options.cache.isFeatureAvailable()) {
+	if (!options.cache.isFeatureAvailable()) {
 		console.error("Github cache is not available");
 	}
 	let inflight = 0;
