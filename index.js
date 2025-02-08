@@ -65,6 +65,7 @@ export async function run() {
 	} else {
 		await start();
 		core.saveState(STATE_STARTED, "1");
+		core.exportVariable("NIX_CONFIG", "extra-substituters = http://localhost:18008")
 	}
 }
 
