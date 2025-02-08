@@ -177,23 +177,23 @@ export function server(options) {
 		if (nm) {
 			// narinfo
 			if (req.method == 'GET') {
-				const restored = await chc.restoreCache([`./${nm[1]}.narinfo`], nm[1]);
-				if (restored === undefined) {
+				await chc.restoreCache([`./${nm[1]}.narinfo`], nm[1]);
+				try {
+					const f = await readFile(`./${nm[1]}.narinfo`, { encoding: "utf8" });
+					const url = urlFromNarInfo(f);
+					core.debug(`narinfo ${nm[1]} is in cache, referencing ${url}`);
+					narsFiles[url] = nm[1]
+					res.writeHead(200, {
+						'Content-Length': Buffer.byteLength(f),
+						'Content-Type': 'text/x-nix-narinfo',
+					});
+					await pipeline(f, res);
+					return;
+				} catch (e) {
 					core.debug(`narinfo ${nm[1]} is not in cache`);
 					res.writeHead(404).end();
 					return
 				}
-
-				const f = await readFile(`./${nm[1]}.narinfo`, { encoding: "utf8" });
-				const url = urlFromNarInfo(f);
-				core.debug(`narinfo ${nm[1]} is in cache, referencing ${url}`);
-				narsFiles[url] = nm[1]
-				res.writeHead(200, {
-					'Content-Length': Buffer.byteLength(f),
-					'Content-Type': 'text/x-nix-narinfo',
-				});
-				await pipeline(f, res);
-				return;
 			} else if (req.method == 'PUT') {
 				const b = await body(req);
 				const url = urlFromNarInfo(b);
