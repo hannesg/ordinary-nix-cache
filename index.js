@@ -178,18 +178,18 @@ export function server(options) {
 			if (req.method == 'GET') {
 				const restored = await chc.restoreCache([`./${nm[1]}.narinfo`], nm[1]);
 				if (restored === undefined) {
-					core.debug(`${nm[1]} is not in cache`);
+					core.debug(`narinfo ${nm[1]} is not in cache`);
 					res.writeHead(404).end();
 					return
 				}
-				core.debug(`${nm[1]} is in cache`);
+
 				const f = await readFile(`./${nm[1]}.narinfo`, { encoding: "utf8" });
 				const url = urlFromNarInfo(f);
-				core.debug(`${url} is now known`)
+				core.debug(`narinfo ${nm[1]} is in cache, referencing ${url}`);
 				narsFiles[url] = nm[1]
 				res.writeHead(200, {
 					'Content-Length': Buffer.byteLength(f),
-					'Content-Type': 'text/plain',
+					'Content-Type': 'text/x-nix-narinfo',
 				});
 				await pipeline(f, res);
 				return;
@@ -201,12 +201,10 @@ export function server(options) {
 					res.writeHead(400).end();
 					return
 				}
-				const f = await open(`./${nm[1]}.narinfo`, 'w');
-				await pipeline(b, f, { end: false });
-				await f.close();
+				await writeFile(`./${nm[1]}.narinfo`, b)
 				// TODO: check that nar exists
 				await chc.saveCache([`./${nm[1]}.narinfo`, `./${url}`], nm[1]);
-				core.debug(`${nm[1]} added to cache`);
+				core.debug(`narinfo ${nm[1]} added to cache, referencing ${url}`);
 				res.writeHead(204, {})
 				res.end()
 				return
@@ -215,6 +213,7 @@ export function server(options) {
 		const path = url.pathname.replace(/^\//, "")
 		if (narsFiles[path]) {
 			const narFile = narsFiles[path]
+			core.debug(`narinfo ${narFile} found referencing ${path}`);
 			if (req.method == 'GET') {
 				const key = await chc.restoreCache([`./${path}`], narFile);
 				if (!key) {
@@ -226,7 +225,7 @@ export function server(options) {
 				const s = await f.stat();
 				res.writeHead(200, {
 					'Content-Length': s.size,
-					'Content-Type': 'text/plain',
+					'Content-Type': 'application/x-nix-nar',
 				});
 				await pipeline(f.createReadStream(), res);
 				return;
@@ -244,6 +243,7 @@ export function server(options) {
 				return
 			}
 		}
+		core.error(`unhandled request ${req.method} ${url.pathname}`);
 		res.writeHead(404).end();
 	}
 }
