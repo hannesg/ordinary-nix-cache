@@ -12,5 +12,3 @@ jobs:
         uses: ./
       - name: Nix build
         run: nix copy --to "http://localhost:18008" ".#devShell.x86_64-linux"
-      - name: Cat log
-        run: cat output.log

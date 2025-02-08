@@ -65,7 +65,7 @@ export async function run() {
 	} else {
 		await start();
 		core.saveState(STATE_STARTED, "1");
-		core.exportVariable("NIX_CONFIG", "extra-substituters = http://localhost:18008")
+		core.exportVariable("NIX_CONFIG", "extra-substituters = http://localhost:18008?priority=10")
 	}
 }
 
@@ -131,7 +131,7 @@ export function memoryCache() {
 
 const CACHE_INFO = `StoreDir: /nix/store
 WantMassQuery: 1
-Priority: 41`;
+Priority: 10`;
 
 
 const urlFromNarInfo = (narinfo) => {
