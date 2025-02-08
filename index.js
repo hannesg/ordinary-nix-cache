@@ -69,15 +69,15 @@ export async function run() {
 }
 
 async function stop() {
-	if (await shutdown()) {
-		return;
-	}
+	await shutdown()
+	const outlog = await readFile("/tmp/output.log");
+	console.log(outlog.toString());
 };
 async function start() {
 	if (await checkReady()) {
 		return;
 	}
-	const output = openSync("output.log", "a");
+	const output = openSync("/tmp/output.log", "a");
 	core.debug(`running ${process.argv0} ${import.meta.filename} serve`);
 	const server = child_process.spawn(process.argv0, [import.meta.filename, "serve"], { detached: true, stdio: ["ignore", output, output] });
 	server.unref();
@@ -87,7 +87,7 @@ async function start() {
 			return;
 		}
 	}
-	const outlog = await readFile("output.log");
+	const outlog = await readFile("/tmp/output.log");
 	console.log(outlog.toString());
 	throw new Error("unable to start nix cache");
 };
