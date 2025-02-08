@@ -78,10 +78,10 @@ async function start() {
 		return;
 	}
 	const output = openSync("output.log", "a");
-	core.debug("running", process.argv0, import.meta.filename, "serve");
+	core.debug(`running ${process.argv0} ${import.meta.filename} serve`);
 	const server = child_process.spawn(process.argv0, [import.meta.filename, "serve"], { detached: true, stdio: ["ignore", output, output] });
 	server.unref();
-	for (let i=0; i < 20; i++) {
+	for (let i = 0; i < 20; i++) {
 		await setTimeout(1000);
 		if (await checkReady()) {
 			return;
@@ -262,6 +262,11 @@ export function serve(options) {
 			res.writeHead(200).write("Goodbye");
 			res.end();
 			srv.close();
+			return;
+		}
+		if (url.pathname == "/readyz") {
+			res.writeHead(200).write("ok");
+			res.end();
 			return;
 		}
 		const id = inflight;
