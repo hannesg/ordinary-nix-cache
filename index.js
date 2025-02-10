@@ -72,7 +72,7 @@ export async function run() {
 async function stop() {
 	await shutdown()
 	const outlog = await readFile("/tmp/output.log");
-	core.log(outlog.toString());
+	console.log(outlog.toString());
 };
 async function start() {
 	if (await checkReady()) {
