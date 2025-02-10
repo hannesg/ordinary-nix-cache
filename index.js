@@ -12,6 +12,7 @@ import * as cache from "@actions/cache";
 const LISTEN = 18008;
 
 const STATE_STARTED = "MNC_STARTED";
+const PREFIX = "nix0:"
 
 function req(path) {
 	return new Promise((resolve, reject) => {
@@ -201,7 +202,7 @@ export function server(options) {
 			// narinfo
 			if (req.method == 'GET') {
 				core.debug(`trying to restore narinfo "${nm[1]}"`)
-				await chc.restoreCache([`./${nm[1]}`], nm[1]);
+				await chc.restoreCache([`./${nm[1]}`], PREFIX + nm[1]);
 				try {
 					const f = await readFile(`./${nm[1]}/narinfo`, { encoding: "utf8" });
 					const url = urlFromNarInfo(f);
@@ -230,8 +231,7 @@ export function server(options) {
 				await writeFile(`./${nm[1]}/narinfo`, b)
 				await mkdir(`./${nm[1]}/nar`, { recursive: true })
 				await rename(`./${url}`, `./${nm[1]}/${url}`)
-				// TODO: check that nar exists
-				await chc.saveCache([`./${nm[1]}`], nm[1]);
+				await chc.saveCache([`./${nm[1]}`], PREFIX + nm[1]);
 				core.debug(`narinfo ${nm[1]} added to cache, referencing ${url}`);
 				res.writeHead(204, {})
 				res.end()
