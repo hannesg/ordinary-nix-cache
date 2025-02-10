@@ -1,9 +1,9 @@
 import process from "node:process";
 import child_process from "node:child_process";
 import { mkdirSync, openSync } from "node:fs";
-import { open, readFile, writeFile } from "node:fs/promises";
+import { open, mkdir, rename, stat, readdir, readFile, writeFile } from "node:fs/promises";
 import http from "node:http";
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 const { pipeline } = require('node:stream/promises');
 import { setTimeout } from "node:timers/promises";
 import * as core from "@actions/core";
@@ -50,9 +50,9 @@ async function shutdown() {
 	const prom = req("quit")
 	try {
 		const res = await prom;
-		console.debug(`quit: ${res.statusCode} ${res.body}`)
+		core.debug(`quit: ${res.statusCode} ${res.body}`)
 	} catch (err) {
-		console.log(`quit: ${err}`);
+		core.log(`quit: ${err}`);
 	}
 	return false;
 }
@@ -72,7 +72,7 @@ export async function run() {
 async function stop() {
 	await shutdown()
 	const outlog = await readFile("/tmp/output.log");
-	console.log(outlog.toString());
+	core.log(outlog.toString());
 };
 async function start() {
 	if (await checkReady()) {
@@ -93,33 +93,55 @@ async function start() {
 	throw new Error("unable to start nix cache");
 };
 
-
 export function memoryCache() {
 	const storage = {};
+	const readRecursive = async (path, result = {}) => {
+		const s = await stat(path);
+		if (s.isDirectory()) {
+			const files = await readdir(path);
+			for (const file of files) {
+				await readRecursive(join(path, file), result)
+			}
+		} else if (s.isFile()) {
+			result[path] = await readFile(path);
+		}
+		return result;
+	}
+	const writeRecursive = async (files) => {
+		for (const path in files) {
+			await mkdir(dirname(path), { recursive: true })
+			await writeFile(path, files[path])
+		}
+	}
 	return {
 		isFeatureAvailable: () => true,
 		saveCache: async (paths, key) => {
-			const files = {}
+			const pathSpec = JSON.stringify(paths)
+			const files = []
 			for (const path of paths) {
-				files[path] = await readFile(path);
+				files.push(await readRecursive(path));
 			}
-			storage[key] = files
+			storage[key] = {
+				pathSpec: pathSpec,
+				files: files
+			}
 		},
 		restoreCache: async (paths, key, restoreKeys) => {
 			if (!restoreKeys) {
 				restoreKeys = [];
 			}
+			const pathSpec = JSON.stringify(paths)
 			const allKeys = [key, ...restoreKeys];
 			for (const key of allKeys) {
 				const files = storage[key];
 				if (!files) {
 					continue
 				}
-				for (const path of paths) {
-					if (!files[path]) {
-						throw new Error(`${path} is not a valid path for ${key}`)
-					}
-					await writeFile(path, files[path]);
+				if (files.pathSpec != pathSpec) {
+					throw new Error(`paths mismatch in cache ${key}`)
+				}
+				for (const file in files.files) {
+					await writeRecursive(file)
 				}
 				return key;
 			}
@@ -166,6 +188,7 @@ export function server(options) {
 		if (!chc.isFeatureAvailable()) {
 			throw new Error("cache is not available");
 		}
+		core.debug(`${req.method} ${url.pathname}`)
 		if (url.pathname == "/nix-cache-info") {
 			res.writeHead(200, {
 				'Content-Length': Buffer.byteLength(CACHE_INFO),
@@ -177,9 +200,10 @@ export function server(options) {
 		if (nm) {
 			// narinfo
 			if (req.method == 'GET') {
-				await chc.restoreCache([`./${nm[1]}.narinfo`], nm[1]);
+				core.debug(`trying to restore narinfo "${nm[1]}"`)
+				await chc.restoreCache([`./${nm[1]}`], nm[1]);
 				try {
-					const f = await readFile(`./${nm[1]}.narinfo`, { encoding: "utf8" });
+					const f = await readFile(`./${nm[1]}/narinfo`, { encoding: "utf8" });
 					const url = urlFromNarInfo(f);
 					core.debug(`narinfo ${nm[1]} is in cache, referencing ${url}`);
 					narsFiles[url] = nm[1]
@@ -202,9 +226,12 @@ export function server(options) {
 					res.writeHead(400).end();
 					return
 				}
-				await writeFile(`./${nm[1]}.narinfo`, b)
+				await mkdir(`./${nm[1]}`, { recursive: true });
+				await writeFile(`./${nm[1]}/narinfo`, b)
+				await mkdir(`./${nm[1]}/nar`, { recursive: true })
+				await rename(`./${url}`, `./${nm[1]}/${url}`)
 				// TODO: check that nar exists
-				await chc.saveCache([`./${nm[1]}.narinfo`, `./${url}`], nm[1]);
+				await chc.saveCache([`./${nm[1]}`], nm[1]);
 				core.debug(`narinfo ${nm[1]} added to cache, referencing ${url}`);
 				res.writeHead(204, {})
 				res.end()
@@ -216,13 +243,7 @@ export function server(options) {
 			const narFile = narsFiles[path]
 			core.debug(`narinfo ${narFile} found referencing ${path}`);
 			if (req.method == 'GET') {
-				const key = await chc.restoreCache([`./${path}`], narFile);
-				if (!key) {
-					core.error(`${path} should have been in ${narFile} but it's not`)
-					res.writeHead(404).end();
-					return
-				}
-				const f = await open(`./${path}`, 'r');
+				const f = await open(`./${narFile}/${path}`, 'r');
 				const s = await f.stat();
 				res.writeHead(200, {
 					'Content-Length': s.size,
@@ -243,6 +264,10 @@ export function server(options) {
 				res.end()
 				return
 			}
+			if (req.method == 'GET' || req.method == 'HEAD') {
+				res.writeHead(404).end();
+				return
+			}
 		}
 		core.error(`unhandled request ${req.method} ${url.pathname}`);
 		res.writeHead(404).end();
@@ -251,7 +276,7 @@ export function server(options) {
 
 export function serve(options) {
 	if (!options.cache.isFeatureAvailable()) {
-		console.error("Github cache is not available");
+		core.error("Github cache is not available");
 	}
 	let inflight = 0;
 	const reqs = {};
@@ -283,7 +308,7 @@ export function serve(options) {
 if (process.argv[2] == "serve") {
 	serve({ cache: cache, dir: "/tmp" });
 } else if (process.argv[2] == "serve-local") {
-	serve({ cache: memoryCache(), dir: "/tmp" });
+	serve({ cache: memoryCache(), dir: "/tmp/ghn" });
 } else {
 	await run();
 }
