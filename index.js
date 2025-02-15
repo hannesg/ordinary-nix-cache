@@ -1,11 +1,12 @@
 import process from "node:process";
 import child_process from "node:child_process";
-import { mkdirSync, openSync } from "node:fs";
+import { createReadStream, mkdirSync, openSync } from "node:fs";
 import { open, mkdir, rename, stat, readdir, readFile, writeFile } from "node:fs/promises";
 import http from "node:http";
 import { join, dirname } from 'node:path';
 const { pipeline } = require('node:stream/promises');
 import { setTimeout } from "node:timers/promises";
+import { createHash } from "crypto"
 import * as core from "@actions/core";
 import * as cache from "@actions/cache";
 
@@ -165,6 +166,36 @@ const urlFromNarInfo = (narinfo) => {
 	return undefined
 }
 
+const parseNarInfo = (narinfo) => {
+	return narinfo.toString().split("\n").map(l => l.split(": ")).filter(l => l.length > 1).reduce((obj, k) => { obj[k[0]] ||= []; obj[k[0]].push(k[1]); return obj }, {})
+}
+
+const hash = async (algo, file) => {
+	const hsh = createHash(algo)
+	const stream = createReadStream(file)
+	for await (const chunk of stream) {
+		hsh.update(chunk)
+	}
+	return hsh.digest("hex")
+}
+
+const nixBase32Alpha = "0123456789abcdfghijklmnpqrsvwxyz";
+export const nixBase32 = (input) => {
+	// see https://github.com/NixOS/nix/blob/master/src/libutil/hash.cc#L83-L107
+	const src = Buffer.from(input, "hex")
+	const b32length = Math.ceil(src.byteLength * 8 / 5)
+	const r = Buffer.alloc(b32length)
+	for (let n = b32length - 1; n >= 0; n -= 1) {
+		const b = n * 5;
+		const i = b >> 3;
+		const j = b % 8;
+		const c2 = i >= (src.length - 1) ? 0 : (src.readUint8(i + 1) << (8 - j));
+		const c = ((src.readUint8(i) >> j) | c2) & 0x1f;
+		r.write(nixBase32Alpha.charAt(c), b32length - 1 - n)
+	}
+	return r.toString()
+}
+
 const body = (req) => {
 	return new Promise((resolve, reject) => {
 		let body = [];
@@ -221,11 +252,16 @@ export function server(options) {
 				}
 			} else if (req.method == 'PUT') {
 				const b = await body(req);
-				const url = urlFromNarInfo(b);
-				if (!url) {
+				const info = parseNarInfo(b);
+				if (!info["URL"]) {
 					core.error(`${nm[1]} should have an URL: ${b}`)
 					res.writeHead(400).end();
 					return
+				}
+				const url = info["URL"][0];
+				const h = nixBase32(await hash("sha256", `./${url}`));
+				if (info["FileHash"][0] != `sha256:${h}`) {
+					core.warning(`expected ${info["FileHash"][0]}, got sha256:${h}`)
 				}
 				await mkdir(`./${nm[1]}`, { recursive: true });
 				await writeFile(`./${nm[1]}/narinfo`, b)
@@ -257,9 +293,10 @@ export function server(options) {
 		if (nam) {
 			if (req.method == 'PUT') {
 				const f = await open(`./${nam[1]}`, 'w');
-				await pipeline(req, f, { end: false });
+				await pipeline(req, f.createWriteStream(), { end: false });
 				await f.close();
-				core.debug(`${nam[1]} added to files`);
+				const h = await hash("sha256", `./${nam[1]}`);
+				core.debug(`${nam[1]} added to files ( hash sha256:${nixBase32(h)})`);
 				res.writeHead(204, {})
 				res.end()
 				return
