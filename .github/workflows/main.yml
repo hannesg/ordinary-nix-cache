@@ -11,4 +11,6 @@ jobs:
       - name: Setup Cache
         uses: ./
       - name: Nix build
-        run: nix copy --to "http://localhost:18008" ".#devShell.x86_64-linux"
+        run: nix build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}' 
+      - name: Nix build again
+        run: nix build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}' 
