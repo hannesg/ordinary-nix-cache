@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { request } from "node:http"
 
 const main = () => {
