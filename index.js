@@ -67,7 +67,7 @@ export async function run() {
 	} else {
 		await start();
 		core.saveState(STATE_STARTED, "1");
-		const configFile = "/tmp/ghn/nix.conf";
+		const configFile = "/tmp/ghn-nix.conf";
 		const autoUpload = `${import.meta.dirname}/upload.js`;
 		await writeFile(configFile, `extra-substituters = http://localhost:18008?priority=10&trusted=true
 post-build-hook = ${autoUpload}
