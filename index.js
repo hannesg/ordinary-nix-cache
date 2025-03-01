@@ -4,7 +4,7 @@ import { createReadStream, mkdirSync, openSync } from "node:fs";
 import { open, mkdir, rename, stat, readdir, readFile, writeFile } from "node:fs/promises";
 import http from "node:http";
 import { join, dirname } from 'node:path';
-const { pipeline } = require('node:stream/promises');
+import { pipeline } from 'node:stream/promises';
 import { setTimeout } from "node:timers/promises";
 import { createHash } from "crypto"
 import * as core from "@actions/core";
@@ -67,7 +67,13 @@ export async function run() {
 	} else {
 		await start();
 		core.saveState(STATE_STARTED, "1");
-		core.exportVariable("NIX_CONFIG", "extra-substituters = http://localhost:18008?priority=10&trusted=true")
+		const configFile = "/tmp/ghn/nix.conf";
+		const autoUpload = `${import.meta.dirname}/upload.js`;
+		await writeFile(configFile, `extra-substituters = http://localhost:18008?priority=10&trusted=true
+post-build-hook = ${autoUpload}
+`, {})
+		core.exportVariable("ORDINARY_NIX_CACHE", "http://localhost:18008")
+		core.exportVariable("NIX_USER_CONF_FILES", configFile)
 	}
 }
 
@@ -227,6 +233,16 @@ export function server(options) {
 				'Content-Type': 'text/plain',
 			}).end(CACHE_INFO);
 			return;
+		}
+		if (url.pathname == "/upload") {
+			const b = await body(req);
+			const paths = b.toString().split(' ')
+			res.writeHead(204, {})
+			res.end()
+			core.debug(`running nix copy --to http://localhost:18008 ${paths}`)
+			child_process.spawn("nix", ["copy", "--to", "http://localhost:18008", ...paths], { detached: true, stdio: ["ignore", "inherit", "inherit"] });
+
+			return
 		}
 		const nm = narinfo.exec(url.pathname);
 		if (nm) {
