@@ -6,10 +6,10 @@ const main = () => {
 	return new Promise((resolve, reject) => {
 		try {
 			const req = request("http://localhost:18008/upload", { method: "POST" }, (res) => {
-				res.on("end", resolve)
 				res.on("error", reject)
 			})
 			req.on("error", reject)
+			req.on("close", resolve)
 			req.write(paths)
 			req.end()
 		} catch (e) {
