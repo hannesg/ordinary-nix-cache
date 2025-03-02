@@ -3,7 +3,7 @@ on: [push]
 jobs:
   nix-build:
     runs-on: ubuntu-latest
-    name: Yo
+    name: Test caching works
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -12,5 +12,9 @@ jobs:
         uses: ./
       - name: Nix build
         run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
+      - name: Delete local nix cache
+        run: |
+          mv result old-result
+          nix-store --delete ./old-result
       - name: Nix build again
-        run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
+        run: nix-build --max-jobs 0 --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
