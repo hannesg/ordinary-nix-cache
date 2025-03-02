@@ -12,9 +12,5 @@ jobs:
         uses: ./
       - name: Nix build
         run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
-      - name: Delete local nix cache
-        run: |
-          mv result old-result
-          nix-store --delete ./old-result
-      - name: Nix build again
-        run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
+      - name: Check nix cache
+        run: nix store ls --store $ORDINARY_NIX_CACHE ./result
