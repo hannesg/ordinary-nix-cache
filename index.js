@@ -253,16 +253,18 @@ export function server(options) {
 				try {
 					const f = await readFile(`./${nm[1]}/narinfo`, { encoding: "utf8" });
 					const url = urlFromNarInfo(f);
-					core.debug(`narinfo ${nm[1]} is in cache, referencing ${url}`);
 					narsFiles[url] = nm[1]
 					res.writeHead(200, {
 						'Content-Length': Buffer.byteLength(f),
 						'Content-Type': 'text/x-nix-narinfo',
 					});
 					await pipeline(f, res);
+
+					core.info(`✅ ${nm[1]} found in cache, referencing ${url}`)
 					return;
 				} catch (e) {
-					core.debug(`narinfo ${nm[1]} is not in cache`);
+
+					core.info(`❌ ${nm[1]} not found in cache `)
 					res.writeHead(404).end();
 					return
 				}
@@ -287,6 +289,7 @@ export function server(options) {
 				core.debug(`narinfo ${nm[1]} added to cache, referencing ${url}`);
 				res.writeHead(204, {})
 				res.end()
+				core.info(`💾 added cache ${nm[1]}`)
 				return
 			}
 		}
