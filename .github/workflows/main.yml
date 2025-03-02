@@ -1,9 +1,9 @@
 on: [push]
 
 jobs:
-  nix-build:
+  first-build:
     runs-on: ubuntu-latest
-    name: Test caching works
+    name: First build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -12,5 +12,16 @@ jobs:
         uses: ./
       - name: Nix build
         run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
-      - name: Check nix cache
-        run: nix store ls --store $ORDINARY_NIX_CACHE ./result
+
+  second-build:
+    runs-on: ubuntu-latest
+    name: Second build
+    needs: first-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup Cache
+        uses: ./
+      - name: Nix build
+        run: nix-build --max-jobs 0 --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
