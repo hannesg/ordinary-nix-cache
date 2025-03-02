@@ -17,4 +17,4 @@ jobs:
           mv result old-result
           nix-store --delete ./old-result
       - name: Nix build again
-        run: nix-build --max-jobs 0 --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
+        run: nix-build --expr 'derivation { name = "dummy"; builder = "/bin/sh"; system = builtins.currentSystem;  args = ["-c" "echo ${{github.sha}} > $out"];}'
