@@ -9,7 +9,7 @@ jobs:
   build:
     steps:
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: hannesg/ordinary-nix-cache@0.1.0  # <---- here
+      - uses: hannesg/ordinary-nix-cache@v0.1.0  # <---- here
       - run: nix build ".#devShell.x86_64-linux"
 ```
 
