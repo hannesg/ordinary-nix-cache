@@ -1,5 +1,8 @@
 name: 'Ordinary Nix Cache'
 description: 'Caches build results in the github actions cache.'
+branding:
+  icon: "box"
+  color: "blue"
 inputs: {}
 outputs: {}
 runs:
