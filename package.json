@@ -1,0 +1,16 @@
+{
+  "name": "ordinary-nix-cache",
+  "module": "index.js",
+  "type": "module",
+  "devDependencies": {
+    "@github/local-action": "^2.5.1",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@actions/cache": "^4.0",
+    "@actions/core": "^1.11"
+  }
+}

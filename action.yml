@@ -1,5 +1,5 @@
-name: 'Hello World'
-description: 'Greet someone and record the time'
+name: 'Ordinary Nix Cache'
+description: 'Caches build results in the github actions cache.'
 inputs: {}
 outputs: {}
 runs:
